@@ -1,0 +1,164 @@
+# A Simple Agent Harness Design
+
+This repo is a minimal harness of [Confucius Code Agent (CCA)](https://arxiv.org/abs/2512.10398) to run [SWEBench-Pro](https://scale.com/leaderboard/swe_bench_pro_public)
+
+## Philosophy
+
+**Put the agent inside the container, not outside.**
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                        Docker Container                            │
+│                                                                    │
+│  ┌──────────────────────────────────────────────────────────────┐ │
+│  │                          Agent                                │ │
+│  │                                                               │ │
+│  │  • Receives task                                             │ │
+│  │  • Reasons about solution                                    │ │
+│  │  • Executes actions directly                                 │ │
+│  │  • Returns results                                           │ │
+│  └──────────────────────────────────────────────────────────────┘ │
+│                              │                                     │
+│                              │ direct execution                    │
+│                              ▼                                     │
+│  ┌──────────────────────────────────────────────────────────────┐ │
+│  │                    Available Actions                          │ │
+│  │                                                               │ │
+│  │  bash()        → subprocess.run(cmd, shell=True)             │ │
+│  │  read_file()   → open(path).read()                           │ │
+│  │  write_file()  → open(path, 'w').write(content)              │ │
+│  │  ...           → anything Python/system can do               │ │
+│  └──────────────────────────────────────────────────────────────┘ │
+│                              │                                     │
+│                              ▼                                     │
+│  ┌──────────────────────────────────────────────────────────────┐ │
+│  │                   Container Filesystem                        │ │
+│  │                                                               │ │
+│  │  /repo/         ← Target codebase                            │ │
+│  │  /workspace/    ← Working directory                          │ │
+│  └──────────────────────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+## Why Not an Abstraction Layer?
+
+Frameworks like [SWE-ReX](https://github.com/SWE-agent/SWE-ReX) run the agent on the host and communicate with the container via a runtime abstraction:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      SWE-agent                              │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │                    SWEEnv                           │    │
+│  │  • deployment: AbstractDeployment                   │    │
+│  │  • communicate() → BashAction → BashObservation     │    │
+│  │  • read_file(), write_file()                        │    │
+│  └────────────────────────────────────────────────────┘    │
+└─────────────────────────┬───────────────────────────────────┘
+                          │ uses
+┌─────────────────────────▼───────────────────────────────────┐
+│                       SWE-ReX                               │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │             Deployment Layer                          │  │
+│  │  DockerDeployment.start() → podman run               │  │
+│  └──────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │              Runtime Layer                            │  │
+│  │  LocalDockerRuntime → podman exec                    │  │
+│  │  BashSession → pexpect shell interaction             │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+This introduces an **abstraction scalability problem**:
+
+- Every operation (bash, read file, write file, ...) needs explicit abstraction
+- Adding new capabilities requires changes across ~8 files
+- Not well tested on agent implementations other than SWE-Agent.
+- Debugging spans multiple layers and network boundaries
+
+**Our approach**: Give the agent direct access. Need to watch a file? Just use `watchdog`. Need to inspect a process? Just use `psutil`. No abstraction layer to extend.
+
+## Who Should Use This?
+
+| You are... | Recommendation |
+|------------|----------------|
+| **Training models** | ✅ Use this. Your scaffold is frozen anyway—just bake it into the image. Parallelize by spinning up N containers. |
+| **Developing agents** | ✅ Use this. Image rebuilds take ~30s with layer caching. The debugging simplicity is worth it. |
+| **Need to swap Docker/AWS/Modal dynamically** | ❌ Use SWE-ReX, better support for Modal |
+
+## The Tradeoff
+
+| | Agent Inside (this approach) | Agent Outside (SWE-ReX) |
+|---|:---:|:---:|
+| Simplicity | ✅ | ❌ |
+| Latency | ✅ | ❌ |
+| Debugging | ✅ | ❌ |
+| Extensibility | ✅ | ❌ |
+| Agent isolation from sandbox | ❌ | ✅ |
+| Multi-platform abstraction | ❌ | ✅ |
+
+# Getting Started
+## Install Confucius-Code-Agent (CCA)
+1) Create a conda environment and install dependencies
+
+- From the repo root (this directory contains `confucius/` and `requirements.txt`):
+  - Create and activate an environment
+    - `conda create -n confucius python=3.12 -y`
+    - `conda activate confucius`
+  - Install Python dependencies
+    - `pip install -r requirements.txt`
+2) Configure provider credentials (choose one)
+
+Confucius can talk to multiple LLM providers. Set the env vars for the provider you intend to use, for running swebench we use bedrock API as Anthropic model providers:
+
+- AWS Bedrock (via boto3): ensure your AWS credentials/region are configured
+  - `export AWS_REGION=us-east-1`
+  - and either `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` or a named profile.
+  - optionally a bedrock API key `AWS_BEARER_TOKEN_BEDROCK` can also be exported
+
+
+## Run CCA in Docker Container
+This option directly installs CCA in the target docker container and run it along with SWE-bench test instances. Note for some docker images some CCA python libs may not be supported.
+### Build
+Run the following to package a CF entrypoing into PEX binary, here -m can be any entrypoint of choice, -o is the output binary path, the script "run_swebench.py" is the entrypoint of swe-bench instances when running in a docker environment, including both swebench-pro and swebench-verified.
+```bash
+# Ensure conda env is packed to tar file
+conda activate confucius
+conda install -c conda-forge conda-pack
+conda-pack -n confucius -o cf_env.tar.gz
+
+pex . \
+  -r requirements.txt \
+  -m scripts.run_swebench \
+  -o app.pex \
+  --python-shebang="/usr/bin/env python3"
+```
+
+### Docker Entrypoint
+Prepare your workspace:
+```
+workspace/
+├── app.pex            # pex build artifact
+├── cf_env.tar.gz      # packed conda env
+├── solutions/         # output patch
+├── logs/              # output agent logs
+└── problem_statements/
+    ├── <task_id>.txt     # swebench instance problem description
+    ...
+
+```
+
+Use the following script as docker entrypoint: [run_sbp.sh](scripts/run_sbp.sh)
+
+Start the container
+```bash
+docker run --rm -e TASK_ID={} -e AWS_BEARER_TOKEN_BEDROCK=<bedrock token> -v <your workspace>:/data --network host --userns=host --entrypoint /data/run_sbp.sh
+```
+
+## Option 2 - Docker As Runtime Layer
+There are around 88 instances in SWE-bench-pro which has alpine linux docker images that cannot install the conda env of CCA, for these instances we create a similar setup as SWE-Rex which directly let Confucius agent interact with sandbox like Docker containers.
+Coming soon...
+
+## License
+
+MIT — see LICENSE.

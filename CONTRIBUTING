@@ -1,0 +1,20 @@
+# Contributing
+
+Thank you for your interest in contributing!
+
+## Getting Started
+- Discuss major changes via Issues before opening a PR
+- Keep changes small and focused
+- Follow the Code of Conduct
+
+## Development Workflow
+1. Fork or create a local commit
+2. Write tests where applicable
+3. Run linters and ensure no warnings
+4. Open a Pull Request with a clear title and summary
+
+## Code of Conduct
+Please follow our Code of Conduct detailed in CODE_OF_CONDUCT.
+
+## License
+By contributing to this repository, you agree that your contributions will be licensed under the LICENSE file of this project.
