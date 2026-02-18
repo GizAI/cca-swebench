@@ -30,6 +30,25 @@ def _read_prompt(prompt_file: Path) -> str:
     return content
 
 
+def _read_prompt_file_or_text(prompt_value: str) -> tuple[str, str]:
+    possible_file = Path(prompt_value)
+    if possible_file.exists() and possible_file.is_file():
+        return (_read_prompt(possible_file), str(possible_file))
+    content = prompt_value.strip()
+    if not content:
+        raise ValueError("--prompt is empty")
+    return (content, "inline")
+
+
+def _read_prompt_stdin() -> str:
+    if sys.stdin.isatty():
+        raise ValueError("stdin is empty")
+    content = sys.stdin.read().strip()
+    if not content:
+        raise ValueError("stdin prompt is empty")
+    return content
+
+
 def _build_swebench_prompt(problem_statement: str) -> str:
     template = Template(
         """## Work directory
@@ -355,7 +374,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Universal CCA runner with Codex/OpenAI/Anthropic model selection"
     )
-    parser.add_argument("--prompt", type=str, default=None, help="Path to prompt txt file")
+    parser.add_argument(
+        "--prompt",
+        type=str,
+        default=None,
+        help="Prompt input. If this points to an existing file, file contents are used; otherwise treated as inline text.",
+    )
     parser.add_argument(
         "--provider",
         type=str,
@@ -429,14 +453,14 @@ def main() -> None:
                 print(f"  {'OK' if ok else 'FAIL'} {model}: {msg}")
         return
 
-    if not args.prompt:
-        print("Failed to prepare runtime: --prompt is required unless --list-models is set", file=sys.stderr)
-        sys.exit(1)
-
-    prompt_file = Path(args.prompt)
+    prompt_source = "stdin"
 
     try:
-        source_prompt = _read_prompt(prompt_file)
+        if args.prompt:
+            source_prompt, prompt_source = _read_prompt_file_or_text(args.prompt)
+        else:
+            source_prompt = _read_prompt_stdin()
+
         prompt = source_prompt if args.raw_prompt else _build_swebench_prompt(source_prompt)
         model = _apply_provider_defaults(
             args.provider, args.model, codex_auth_path, discovered_models
@@ -451,7 +475,7 @@ def main() -> None:
         print(f"  provider={args.provider}")
         print(f"  model={model}")
         print(f"  entry_name={args.entry_name}")
-        print(f"  prompt={prompt_file}")
+        print(f"  prompt_source={prompt_source}")
         print(f"  OPENAI_BASE_URL={os.environ.get('OPENAI_BASE_URL', '')}")
         print(f"  OPENAI_CHATGPT_ACCOUNT_ID={'set' if os.environ.get('OPENAI_CHATGPT_ACCOUNT_ID') else 'unset'}")
         print(f"  OPENAI_API_KEY={'set' if os.environ.get('OPENAI_API_KEY') else 'unset'}")

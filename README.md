@@ -139,6 +139,12 @@ python -m venv .venv
 # Codex mode (default): uses ~/.codex/auth.json (from `codex login`)
 .venv/bin/python -m scripts.run_universal_agent --prompt /path/to/problem.txt --provider codex --dry-run
 
+# No file needed: inline prompt via the same --prompt option
+.venv/bin/python -m scripts.run_universal_agent --prompt "Fix failing unit tests in current repo" --provider codex --raw-prompt --dry-run
+
+# No file needed: stdin prompt
+echo "Fix failing unit tests in current repo" | .venv/bin/python -m scripts.run_universal_agent --provider codex --raw-prompt --dry-run
+
 # List discovered Codex models (+ generated aliases)
 .venv/bin/python -m scripts.run_universal_agent --list-models
 
@@ -169,6 +175,29 @@ Notes:
 - `--dry-run` prints resolved runtime config without invoking the agent.
 - `CCA_MODEL` is auto-set by the launcher so model selection is explicit and reproducible.
 - Codex aliases are generated dynamically from discovered model IDs in `~/.codex/models_cache.json`.
+- Prompt input options: `--prompt <file-or-text>` or stdin pipe.
+
+## Streaming TUI (Codex / Claude style)
+
+Use `scripts/tui_stream.py` for a minimal real-time streaming terminal UI.
+
+```bash
+# Codex streaming TUI (uses `codex login` session)
+.venv/bin/python -m scripts.tui_stream --provider codex
+
+# OpenAI API key mode
+OPENAI_API_KEY=... .venv/bin/python -m scripts.tui_stream --provider openai --model gpt-5.2
+
+# Anthropic mode (Claude-like streaming)
+# one-time install if needed:
+.venv/bin/pip install anthropic
+ANTHROPIC_API_KEY=... .venv/bin/python -m scripts.tui_stream --provider anthropic --model claude-sonnet-4-5-20250929
+```
+
+Behavior:
+- token-by-token streaming output in terminal
+- multi-turn chat history
+- `/exit` or `/quit` to stop
 
 
 ## Run CCA in Docker Container
