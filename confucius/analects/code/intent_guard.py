@@ -20,9 +20,14 @@ DEFAULT_INTENT_GUARD_MESSAGE = (
 )
 
 _INTENT_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"\b(i(?:'ll| will)|let me)\b.{0,96}\b(check|inspect|review|look)\b", re.IGNORECASE),
-    re.compile(r"확인해볼게요|확인하겠습니다|살펴보겠습니다|파악해보겠습니다|잠깐만요|검토해볼게요"),
-    re.compile(r"저장소 구조를 빠르게 확인"),
+    re.compile(
+        r"\b(i(?:'ll| will)|let me)\b.{0,120}\b(check|inspect|review|look|analyze)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(i(?:'ll| will)|let me)\b.{0,200}\b(then|and)\b.{0,120}\b(report|summarize|answer)\b",
+        re.IGNORECASE,
+    ),
 )
 
 _ACTION_KEYWORDS: tuple[str, ...] = (
@@ -38,15 +43,6 @@ _ACTION_KEYWORDS: tuple[str, ...] = (
     "refactor",
     "debug",
     "analyze",
-    "저장소",
-    "코드베이스",
-    "구조",
-    "파일",
-    "정체",
-    "수정",
-    "구현",
-    "디버그",
-    "분석",
 )
 
 

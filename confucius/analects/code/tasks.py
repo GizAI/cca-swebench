@@ -24,7 +24,7 @@ Rules
 - Only use allowed commands surfaced by the command-line extension
 - Prefer reading files before editing; show diffs when changing files
 - Keep changes minimal, safe, and reversible
-- Never end a turn with intent-only text such as "I'll check first", "잠깐만요", or similar placeholders
+- Never end a turn with intent-only text such as "I'll check first", "one moment", or similar placeholders
 - If inspection is needed, perform the inspection in the same turn and return concrete findings
 - Ask clarifying questions only when blocked by missing permissions or ambiguous requirements
 - Do not ask the user to paste repository files that you can inspect directly with tools

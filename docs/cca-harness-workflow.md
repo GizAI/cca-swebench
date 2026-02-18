@@ -55,9 +55,9 @@ scripts/run_swebench.py
 - handles Ctrl+C by first trying `cf.cancel_task()`
 
 `confucius/lib/entry_repl.py`:
-- 반복적으로 입력 받음
-- 각 입력마다 `EntryInput(question, entry_name)` 호출
-- 각 턴 종료 후 session state 저장
+- reads user input in a loop
+- invokes `EntryInput(question, entry_name)` for each turn
+- saves session state after each turn
 
 ## A4) Original Code analect composition
 
@@ -190,11 +190,8 @@ This section is **not upstream behavior**, only fork changes.
 
 ## B1) Unified launcher introduced
 
-- new: `scripts/cca.py`
-- new: `scripts/provider_runtime.py`
-- removed legacy split launchers:
-  - `scripts/run_universal_agent.py`
-  - `scripts/tui_stream.py`
+- user-facing launcher: `cca` (`scripts/cca.py`)
+- runtime layer: `scripts/provider_runtime.py` (provider auth/model discovery/validation)
 
 ## B2) Model/auth runtime added
 
@@ -230,8 +227,15 @@ If you are operating this fork in production shell usage:
 ## Part D. Exact Change Inventory vs Upstream
 
 Baseline used here:
-- upstream: `origin/main` at `73d1b99`
-- fork state: `HEAD` at `aa8c487`
+- upstream baseline branch: `origin/main`
+- fork baseline branch: `HEAD`
+
+To snapshot exact commit IDs at the time you read this document:
+
+```bash
+git rev-parse --short origin/main
+git rev-parse --short HEAD
+```
 
 Regenerate the exact list:
 
@@ -246,6 +250,7 @@ git diff --name-status origin/main..HEAD
 | `A` | `confucius/analects/code/intent_guard.py` | Guard extension for intent-only turn endings |
 | `A` | `scripts/cca.py` | Unified launcher (TUI + one-shot + provider runtime wiring) |
 | `A` | `scripts/provider_runtime.py` | Provider auth/model discovery/validation runtime |
+| `A` | `docs/cca-harness-workflow.md` | Comprehensive upstream-vs-fork architecture and workflow guide |
 | `A` | `tests/test_cca.py` | Unit tests for unified launcher behavior |
 | `A` | `tests/test_cca_tui_e2e.py` | Real interactive TUI E2E test |
 | `A` | `tests/test_intent_guard.py` | Guard behavior tests |

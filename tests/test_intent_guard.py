@@ -23,15 +23,15 @@ def _context_with_messages(messages: list[CfMessage]) -> SimpleNamespace:
 
 def test_intent_only_detection() -> None:
     guard = IntentOnlyResponseGuard()
-    assert guard._looks_intent_only("저장소 구조를 빠르게 확인해 정체를 파악해볼게요.")
+    assert guard._looks_intent_only("Let me inspect the repository structure first.")
     assert guard._looks_intent_only("Let me check the repository structure first.")
     assert guard._looks_intent_only("I will inspect the project and report back.")
-    assert not guard._looks_intent_only("이 저장소는 Nuxt 기반 Ark 통합 플랫폼입니다.")
+    assert not guard._looks_intent_only("This repository is an Ark monorepo built on Nuxt.")
 
 
 def test_requires_action_keywords() -> None:
     guard = IntentOnlyResponseGuard()
-    assert guard._requires_action("이 저장소의 정체는?")
+    assert guard._requires_action("What is this repository?")
     assert guard._requires_action("Please inspect this repository.")
     assert guard._requires_action("Fix this failing test.")
     assert not guard._requires_action("Hello there")
@@ -41,14 +41,14 @@ def test_requires_action_keywords() -> None:
 async def test_interrupts_once_for_intent_only_without_tool_use() -> None:
     guard = IntentOnlyResponseGuard()
     context = _context_with_messages(
-        [CfMessage(type=cf.MessageType.HUMAN, content="이 저장소의 정체는?")]
+        [CfMessage(type=cf.MessageType.HUMAN, content="What is this repository?")]
     )
-    await guard.on_llm_output("저장소 구조를 빠르게 확인해볼게요.", context)
+    await guard.on_llm_output("Let me inspect the repository structure first.", context)
     with pytest.raises(OrchestratorInterruption):
         await guard.on_process_messages_complete(context)
 
     # second call should not interrupt again due to max_retries=1
-    await guard.on_llm_output("저장소 구조를 빠르게 확인해볼게요.", context)
+    await guard.on_llm_output("Let me inspect the repository structure first.", context)
     await guard.on_process_messages_complete(context)
 
 
@@ -56,8 +56,8 @@ async def test_interrupts_once_for_intent_only_without_tool_use() -> None:
 async def test_no_interrupt_when_tool_used() -> None:
     guard = IntentOnlyResponseGuard()
     context = _context_with_messages(
-        [CfMessage(type=cf.MessageType.HUMAN, content="이 저장소의 정체는?")]
+        [CfMessage(type=cf.MessageType.HUMAN, content="What is this repository?")]
     )
-    await guard.on_llm_output("저장소 구조를 빠르게 확인해볼게요.", context)
+    await guard.on_llm_output("Let me inspect the repository structure first.", context)
     await guard.on_before_tool_use(SimpleNamespace(name="bash"), context)
     await guard.on_process_messages_complete(context)
