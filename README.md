@@ -222,6 +222,14 @@ Requires valid Codex auth state.
 .venv/bin/pytest tests/test_cca_tui_e2e.py -m e2e -q
 ```
 
+## SWE-Bench Pro (Reproducible)
+
+Use the reproducible runner:
+- `scripts/run_swebench_pro_codex.py`
+
+Full step-by-step guide:
+- `docs/swebench-pro-repro.md`
+
 ## Docker workflow
 
 This repo supports the packaged SWE-bench container workflow.
