@@ -182,22 +182,34 @@ Notes:
 Use `scripts/tui_stream.py` for a minimal real-time streaming terminal UI.
 
 ```bash
+# Show all pluggable backends
+.venv/bin/python -m scripts.tui_stream --list-providers
+
 # Codex streaming TUI (uses `codex login` session)
 .venv/bin/python -m scripts.tui_stream --provider codex
 
 # OpenAI API key mode
 OPENAI_API_KEY=... .venv/bin/python -m scripts.tui_stream --provider openai --model gpt-5.2
 
-# Anthropic mode (Claude-like streaming)
+# Anthropic API mode
 # one-time install if needed:
 .venv/bin/pip install anthropic
 ANTHROPIC_API_KEY=... .venv/bin/python -m scripts.tui_stream --provider anthropic --model claude-sonnet-4-5-20250929
+
+# Claude Code CLI backend (uses local Claude Code OAuth/login state)
+claude login
+.venv/bin/python -m scripts.tui_stream --provider claude-code --model claude-sonnet-4-5-20250929
+
+# Gemini CLI backend (uses local ~/.gemini/oauth_creds.json)
+gemini
+.venv/bin/python -m scripts.tui_stream --provider gemini-cli --model gemini-3-flash-preview
 ```
 
 Behavior:
 - token-by-token streaming output in terminal
 - multi-turn chat history
 - `/exit` or `/quit` to stop
+- provider backends are registry-based and easy to extend
 
 
 ## Run CCA in Docker Container
