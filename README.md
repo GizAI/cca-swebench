@@ -116,6 +116,14 @@ Confucius can talk to multiple LLM providers. Set the env vars for the provider 
   - and either `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` or a named profile.
   - optionally a bedrock API key `AWS_BEARER_TOKEN_BEDROCK` can also be exported
 
+## Architecture Reference
+
+For a comprehensive analysis that covers both:
+- original upstream CCA harness workflow (`origin/main`)
+- unified/runtime-extended workflow in this fork
+
+see: [`docs/cca-harness-workflow.md`](docs/cca-harness-workflow.md)
+
 ## Unified Runner + TUI (Confucius Harness)
 
 Use `scripts/cca.py` as the single launcher for provider auth + model selection while keeping execution inside the Confucius harness.
