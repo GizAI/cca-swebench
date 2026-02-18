@@ -116,6 +116,46 @@ Confucius can talk to multiple LLM providers. Set the env vars for the provider 
   - and either `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` or a named profile.
   - optionally a bedrock API key `AWS_BEARER_TOKEN_BEDROCK` can also be exported
 
+## Universal Runner (Codex/OpenAI/Anthropic)
+
+Use `scripts/run_universal_agent.py` as the CLI entrypoint for CCA runtime selection/auth wiring.
+
+```bash
+# Create venv and install dependencies
+python -m venv .venv
+.venv/bin/pip install -r requirements.txt
+
+# Codex mode (default): uses ~/.codex/auth.json (from `codex login`)
+.venv/bin/python -m scripts.run_universal_agent --prompt /path/to/problem.txt --provider codex --dry-run
+
+# List discovered Codex models (+ generated aliases)
+.venv/bin/python -m scripts.run_universal_agent --list-models
+
+# Validate discovered model IDs against live Codex API
+.venv/bin/python -m scripts.run_universal_agent --validate-models-live
+
+# Run with Codex model
+.venv/bin/python -m scripts.run_universal_agent --prompt /path/to/problem.txt --provider codex
+
+# Run with explicit model ID
+.venv/bin/python -m scripts.run_universal_agent --prompt /path/to/problem.txt --provider codex --model gpt-5.3-codex-spark
+
+# Run with alias (alias map is generated from discovered models, not hardcoded)
+.venv/bin/python -m scripts.run_universal_agent --prompt /path/to/problem.txt --provider codex --model spark
+
+# Run with OpenAI API key flow
+OPENAI_API_KEY=... .venv/bin/python -m scripts.run_universal_agent --prompt /path/to/problem.txt --provider openai --model gpt-5.2
+
+# Run with Anthropic model preset
+.venv/bin/python -m scripts.run_universal_agent --prompt /path/to/problem.txt --provider anthropic --model claude-sonnet-4-5
+```
+
+Notes:
+- If you already ran `codex login`, no extra auth setup is required for `--provider codex`.
+- `--dry-run` prints resolved runtime config without invoking the agent.
+- `CCA_MODEL` is auto-set by the launcher so model selection is explicit and reproducible.
+- Codex aliases are generated dynamically from discovered model IDs in `~/.codex/models_cache.json`.
+
 
 ## Run CCA in Docker Container
 This option directly installs CCA in the target docker container and run it along with SWE-bench test instances. Note for some docker images some CCA python libs may not be supported.

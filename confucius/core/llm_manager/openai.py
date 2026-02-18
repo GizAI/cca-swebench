@@ -3,6 +3,7 @@
 
 import logging
 import os
+import json
 
 from langchain_core.language_models import BaseChatModel
 from openai import AsyncOpenAI
@@ -29,7 +30,31 @@ class OpenAILLMManager(LLMManager):
         """Create/cache AsyncOpenAI client configured via env vars."""
         if self._client is None:
             api_key = os.environ["OPENAI_API_KEY"]
-            self._client = AsyncOpenAI(api_key=api_key)
+            base_url = os.environ.get("OPENAI_BASE_URL")
+            default_headers: dict[str, str] = {}
+
+            env_headers = os.environ.get("OPENAI_DEFAULT_HEADERS")
+            if env_headers:
+                parsed_headers = json.loads(env_headers)
+                if not isinstance(parsed_headers, dict):
+                    raise ValueError(
+                        "OPENAI_DEFAULT_HEADERS must be a JSON object when provided."
+                    )
+                default_headers.update(
+                    {str(key): str(value) for key, value in parsed_headers.items()}
+                )
+
+            if account_id := os.environ.get("OPENAI_CHATGPT_ACCOUNT_ID"):
+                default_headers["ChatGPT-Account-Id"] = account_id
+
+            if originator := os.environ.get("OPENAI_ORIGINATOR"):
+                default_headers["originator"] = originator
+
+            self._client = AsyncOpenAI(
+                api_key=api_key,
+                base_url=base_url,
+                default_headers=default_headers or None,
+            )
         return self._client
 
     def _get_chat(self, params: LLMParams) -> BaseChatModel:

@@ -6,4 +6,4 @@ DEFAULT_MAX_MAX_TOKEN: int = 16384
 
 AZURE_OPENAI_MODEL_PREFIXES = ["gpt", "o1", "o3", "o4"]
 
-OPENAI_MODEL_PREFIXES = []
+OPENAI_MODEL_PREFIXES = ["gpt", "o1", "o3", "o4", "codex"]
