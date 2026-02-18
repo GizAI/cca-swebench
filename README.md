@@ -120,6 +120,17 @@ Confucius can talk to multiple LLM providers. Set the env vars for the provider 
 
 Use `scripts/run_universal_agent.py` as the CLI entrypoint for CCA runtime selection/auth wiring.
 
+### If You Are Migrating From Codex CLI or Claude Code
+
+- Codex CLI users:
+  - run `codex login` once
+  - use `--provider codex` and optional `--model`
+- Claude Code users:
+  - keep your Anthropic env (`ANTHROPIC_API_KEY`) configured
+  - use `--provider anthropic --model claude-sonnet-4-5` (or another Claude model)
+
+This gives a single execution surface for both ecosystems while keeping provider-specific auth native.
+
 ```bash
 # Create venv and install dependencies
 python -m venv .venv
@@ -148,6 +159,9 @@ OPENAI_API_KEY=... .venv/bin/python -m scripts.run_universal_agent --prompt /pat
 
 # Run with Anthropic model preset
 .venv/bin/python -m scripts.run_universal_agent --prompt /path/to/problem.txt --provider anthropic --model claude-sonnet-4-5
+
+# Run from Claude ecosystem with env auth
+ANTHROPIC_API_KEY=... .venv/bin/python -m scripts.run_universal_agent --prompt /path/to/problem.txt --provider anthropic --model claude-sonnet-4-5
 ```
 
 Notes:
