@@ -18,3 +18,9 @@ dependencies = []
 
 [project.scripts]
 confucius = "confucius.cli.main:main"
+cca = "scripts.cca:cli"
+
+[tool.pytest.ini_options]
+markers = [
+  "e2e: real interactive end-to-end tests",
+]

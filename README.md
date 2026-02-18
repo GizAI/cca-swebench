@@ -116,100 +116,98 @@ Confucius can talk to multiple LLM providers. Set the env vars for the provider 
   - and either `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` or a named profile.
   - optionally a bedrock API key `AWS_BEARER_TOKEN_BEDROCK` can also be exported
 
-## Universal Runner (Codex/OpenAI/Anthropic)
+## Unified Runner + TUI (Confucius Harness)
 
-Use `scripts/run_universal_agent.py` as the CLI entrypoint for CCA runtime selection/auth wiring.
+Use `scripts/cca.py` as the single launcher for provider auth + model selection while keeping execution inside the Confucius harness.
 
-### If You Are Migrating From Codex CLI or Claude Code
+Install global `cca` command:
 
-- Codex CLI users:
-  - run `codex login` once
-  - use `--provider codex` and optional `--model`
-- Claude Code users:
-  - keep your Anthropic env (`ANTHROPIC_API_KEY`) configured
-  - use `--provider anthropic --model claude-sonnet-4-5` (or another Claude model)
+```bash
+python3 -m pip install --user -r requirements.txt
+python3 -m pip install --user -e .
+```
 
-This gives a single execution surface for both ecosystems while keeping provider-specific auth native.
+After install, run from anywhere:
+
+```bash
+cca
+```
+
+`cca` defaults to interactive TUI when no prompt is provided.
+
+Supported providers:
+- `codex`: OAuth from `codex login` (`~/.codex/auth.json`)
+- `openai`: `OPENAI_API_KEY`
+- `gemini`: `GOOGLE_API_KEY`/`GEMINI_API_KEY` or Gemini OAuth (`~/.gemini/oauth_creds.json`) via Vertex mode
+- `bedrock`: AWS Bedrock (`AWS_REGION` + AWS credentials)
+- `custom`: explicit `--model`
 
 ```bash
 # Create venv and install dependencies
 python -m venv .venv
 .venv/bin/pip install -r requirements.txt
 
-# Codex mode (default): uses ~/.codex/auth.json (from `codex login`)
-.venv/bin/python -m scripts.run_universal_agent --prompt /path/to/problem.txt --provider codex --dry-run
+# Codex dry-run (uses codex login session)
+.venv/bin/python -m scripts.cca --provider codex --prompt "Fix lint errors" --raw-prompt --dry-run
 
-# No file needed: inline prompt via the same --prompt option
-.venv/bin/python -m scripts.run_universal_agent --prompt "Fix failing unit tests in current repo" --provider codex --raw-prompt --dry-run
+# Prompt can be file path or inline text with the same option
+.venv/bin/python -m scripts.cca --provider codex --prompt /path/to/problem.txt
+.venv/bin/python -m scripts.cca --provider codex --prompt "Fix failing tests" --raw-prompt
 
-# No file needed: stdin prompt
-echo "Fix failing unit tests in current repo" | .venv/bin/python -m scripts.run_universal_agent --provider codex --raw-prompt --dry-run
+# Stdin prompt
+echo "Fix failing tests" | .venv/bin/python -m scripts.cca --provider codex --raw-prompt
 
-# List discovered Codex models (+ generated aliases)
-.venv/bin/python -m scripts.run_universal_agent --list-models
+# Dynamic model discovery + aliases (provider-scoped)
+.venv/bin/python -m scripts.cca --provider codex --list-models
+.venv/bin/python -m scripts.cca --provider gemini --list-models
 
-# Validate discovered model IDs against live Codex API
-.venv/bin/python -m scripts.run_universal_agent --validate-models-live
+# Live model validation
+.venv/bin/python -m scripts.cca --provider codex --validate-models-live
+.venv/bin/python -m scripts.cca --provider gemini --validate-models-live
 
-# Run with Codex model
-.venv/bin/python -m scripts.run_universal_agent --prompt /path/to/problem.txt --provider codex
+# Explicit model selection
+.venv/bin/python -m scripts.cca --provider codex --model gpt-5.3-codex-spark --prompt /path/to/problem.txt
+OPENAI_API_KEY=... .venv/bin/python -m scripts.cca --provider openai --model gpt-5.2 --prompt /path/to/problem.txt
+AWS_REGION=us-east-1 .venv/bin/python -m scripts.cca --provider bedrock --model claude-sonnet-4-5 --prompt /path/to/problem.txt
 
-# Run with explicit model ID
-.venv/bin/python -m scripts.run_universal_agent --prompt /path/to/problem.txt --provider codex --model gpt-5.3-codex-spark
+# Force interactive TUI
+.venv/bin/python -m scripts.cca --provider codex --tui
 
-# Run with alias (alias map is generated from discovered models, not hardcoded)
-.venv/bin/python -m scripts.run_universal_agent --prompt /path/to/problem.txt --provider codex --model spark
+# TUI with optional initial prompt (file or inline)
+.venv/bin/python -m scripts.cca --provider codex --tui --prompt "Review this repository structure"
 
-# Run with OpenAI API key flow
-OPENAI_API_KEY=... .venv/bin/python -m scripts.run_universal_agent --prompt /path/to/problem.txt --provider openai --model gpt-5.2
-
-# Run with Anthropic model preset
-.venv/bin/python -m scripts.run_universal_agent --prompt /path/to/problem.txt --provider anthropic --model claude-sonnet-4-5
-
-# Run from Claude ecosystem with env auth
-ANTHROPIC_API_KEY=... .venv/bin/python -m scripts.run_universal_agent --prompt /path/to/problem.txt --provider anthropic --model claude-sonnet-4-5
+# Explicit solo behavior override
+.venv/bin/python -m scripts.cca --provider codex --tui --solo-mode off
+.venv/bin/python -m scripts.cca --provider codex --prompt "fix tests" --solo-mode on
 ```
 
 Notes:
-- If you already ran `codex login`, no extra auth setup is required for `--provider codex`.
-- `--dry-run` prints resolved runtime config without invoking the agent.
-- `CCA_MODEL` is auto-set by the launcher so model selection is explicit and reproducible.
-- Codex aliases are generated dynamically from discovered model IDs in `~/.codex/models_cache.json`.
-- Prompt input options: `--prompt <file-or-text>` or stdin pipe.
+- `CCA_MODEL` is set by the launcher and consumed by Confucius.
+- Codex aliases are generated dynamically from `~/.codex/models_cache.json`.
+- For `provider=codex`, default model is selected dynamically from discovered IDs and prefers the latest `-spark` variant when available.
+- Gemini OAuth mode auto-discovers a Google Cloud project from the OAuth account if `GEMINI_OAUTH_PROJECT` is unset.
+- Gemini OAuth requires Vertex access in the selected project (if Vertex API is disabled, live generation validation will fail fast).
+- Mode selection is automatic: without `--prompt`, TTY input enters TUI and piped stdin runs one-shot.
+- `--solo-mode auto` is the default: TUI uses solo mode off (prevents endless progress loops), one-shot uses solo mode on.
 
-## Streaming TUI (Codex / Claude style)
+TUI commands:
+- `/help`
+- `/model`
+- `/exit` or `/quit`
 
-Use `scripts/tui_stream.py` for a minimal real-time streaming terminal UI.
+### Real TUI E2E Test
+
+Run a pseudo-terminal integration test (real interactive session) with Codex OAuth + Spark model:
 
 ```bash
-# Show all pluggable backends
-.venv/bin/python -m scripts.tui_stream --list-providers
-
-# Codex streaming TUI (uses `codex login` session)
-.venv/bin/python -m scripts.tui_stream --provider codex
-
-# OpenAI API key mode
-OPENAI_API_KEY=... .venv/bin/python -m scripts.tui_stream --provider openai --model gpt-5.2
-
-# Anthropic API mode
-# one-time install if needed:
-.venv/bin/pip install anthropic
-ANTHROPIC_API_KEY=... .venv/bin/python -m scripts.tui_stream --provider anthropic --model claude-sonnet-4-5-20250929
-
-# Claude Code CLI backend (uses local Claude Code OAuth/login state)
-claude login
-.venv/bin/python -m scripts.tui_stream --provider claude-code --model claude-sonnet-4-5-20250929
-
-# Gemini CLI backend (uses local ~/.gemini/oauth_creds.json)
-gemini
-.venv/bin/python -m scripts.tui_stream --provider gemini-cli --model gemini-3-flash-preview
+.venv/bin/pytest tests/test_cca_tui_e2e.py -m e2e -q
 ```
 
-Behavior:
-- token-by-token streaming output in terminal
-- multi-turn chat history
-- `/exit` or `/quit` to stop
-- provider backends are registry-based and easy to extend
+What it validates:
+- TUI startup banner with selected provider/model
+- `/help` and `/model` commands
+- Real prompt execution against `gpt-5.3-codex-spark`
+- Clean `/exit` shutdown
 
 
 ## Run CCA in Docker Container

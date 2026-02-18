@@ -101,22 +101,68 @@ class ResponsesAPIAdapter(OpenAIBase):
         )
         responses_tools = self._get_response_tools()
         responses_tool_choice = self._get_response_tool_choice()
+        is_codex_backend = self._is_codex_backend()
+        store_value: Any = kwargs.pop("store", NOT_GIVEN)
+        if is_codex_backend:
+            # Codex responses endpoint requires store=false.
+            store_value = False
+
+        request_kwargs: dict[str, Any] = {
+            "input": [msg.to_dict() for msg in input_messages],
+            "instructions": instructions,
+            "model": model,
+            "store": store_value,
+            "tools": responses_tools or NOT_GIVEN,
+            "tool_choice": responses_tool_choice or NOT_GIVEN,
+        }
+        if is_codex_backend:
+            # Codex endpoint is stricter than OpenAI responses API.
+            request_kwargs["stream"] = True
+            # Drop unsupported params if a caller injected them.
+            kwargs.pop("max_output_tokens", None)
+            kwargs.pop("temperature", None)
+            kwargs.pop("top_p", None)
+            kwargs.pop("parallel_tool_calls", None)
+            kwargs.pop("reasoning", None)
+        else:
+            request_kwargs.update(
+                {
+                    "max_output_tokens": self.max_tokens,
+                    "temperature": self.temperature if not is_thinking else NOT_GIVEN,
+                    "top_p": self.top_p if not is_thinking else NOT_GIVEN,
+                    "parallel_tool_calls": True,
+                    "reasoning": reasoning_param,
+                }
+            )
 
         # Create responses API call with all parameters
-        response = await self.client.responses.create(
-            input=[msg.to_dict() for msg in input_messages],
-            instructions=instructions,
-            model=model,
-            max_output_tokens=self.max_tokens,
-            temperature=self.temperature if not is_thinking else NOT_GIVEN,
-            top_p=self.top_p if not is_thinking else NOT_GIVEN,
-            parallel_tool_calls=True,  # Enable parallel tool calls
-            tools=responses_tools or NOT_GIVEN,
-            tool_choice=responses_tool_choice or NOT_GIVEN,
-            reasoning=reasoning_param,
+        response_or_stream = await self.client.responses.create(
+            **request_kwargs,
             **kwargs,
         )
-        return response
+        if isinstance(response_or_stream, Response):
+            return response_or_stream
+        if is_codex_backend:
+            return await self._collect_codex_stream_response(response_or_stream)
+        raise RuntimeError("Unexpected non-Response payload from responses.create().")
+
+    def _is_codex_backend(self) -> bool:
+        base_url = getattr(self.client, "base_url", None)
+        if base_url is None:
+            return False
+        return "/backend-api/codex" in str(base_url).lower()
+
+    async def _collect_codex_stream_response(self, stream: Any) -> Response:
+        final_response: Response | None = None
+        async for event in stream:
+            if getattr(event, "type", None) != "response.completed":
+                continue
+            completed = getattr(event, "response", None)
+            if isinstance(completed, Response):
+                final_response = completed
+        if final_response is None:
+            raise RuntimeError("Codex stream completed without response.completed payload.")
+        return final_response
 
     def _get_response_tools(self) -> list[ToolParam]:
         """Get the list of tools for the response.

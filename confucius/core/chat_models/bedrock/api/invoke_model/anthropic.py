@@ -255,7 +255,7 @@ class TextEditorInput(BaseModel):
     )
     path: str = Field(
         ...,
-        description="Absolute path to file or directory, e.g. `/repo/file.py` or `/repo`.",
+        description="Absolute path to a file or directory under the current workspace, e.g. `/home/user/project/file.py` or `/home/user/project`.",
     )
     file_text: str | None = Field(
         default=None,
@@ -395,7 +395,7 @@ TEXT_EDITOR_SCHEMA: dict[str, Any] = {
             "type": "string",
         },
         "path": {
-            "description": "Absolute path to file or directory, e.g. `/repo/file.py` or `/repo`.",
+            "description": "Absolute path to a file or directory under the current workspace, e.g. `/home/user/project/file.py` or `/home/user/project`.",
             "type": "string",
         },
         "view_range": {

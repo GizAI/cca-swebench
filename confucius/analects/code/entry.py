@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime
+import os
+from pathlib import Path
 from typing import Any, Callable
 
 from ...core import types as cf
@@ -23,6 +25,7 @@ from ...orchestrator.extensions.plan.llm import LLMCodingArchitectExtension
 from ...orchestrator.extensions.solo import SoloModeExtension
 from ...orchestrator.types import OrchestratorInput
 from .commands import get_allowed_commands
+from .intent_guard import IntentOnlyResponseGuard
 from .llm_params import get_code_llm_params
 from .reminders import TodoReminder
 from .tasks import get_task_definition
@@ -31,6 +34,13 @@ from .tasks import get_task_definition
 def get_functions() -> list[Callable[..., Any]]:
     """Placeholder for future function-call tools."""
     return []
+
+
+def _solo_mode_enabled() -> bool:
+    value = os.environ.get("CCA_SOLO_MODE")
+    if value is None:
+        return True
+    return value.strip().lower() not in {"0", "false", "off", "no"}
 
 
 @public
@@ -57,7 +67,8 @@ class CodeAssistEntry(Analect[EntryInput, EntryOutput], EntryAnalectMixin):
 
         # Build task/system prompt from template
         task_def: str = get_task_definition(
-            current_time=datetime.now().isoformat(timespec="seconds")
+            current_time=datetime.now().isoformat(timespec="seconds"),
+            current_working_directory=str(Path.cwd().resolve()),
         )
 
         # Prepare extensions per spec
@@ -75,10 +86,12 @@ class CodeAssistEntry(Analect[EntryInput, EntryOutput], EntryAnalectMixin):
             ),
             FunctionExtension(functions=get_functions(), enable_tool_use=True),
             PlainTextExtension(),
+            IntentOnlyResponseGuard(),
             HierarchicalMemoryExtension(),
             AnthropicPromptCaching(),
-            SoloModeExtension(),
         ]
+        if _solo_mode_enabled():
+            extensions.append(SoloModeExtension())
 
         orchestrator = AnthropicLLMOrchestrator(
             llm_params=[

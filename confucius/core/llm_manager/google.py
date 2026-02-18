@@ -3,8 +3,11 @@
 
 import logging
 import os
+import json
+from pathlib import Path
 
 from google import genai
+from google.oauth2.credentials import Credentials
 from langchain_core.language_models import BaseChatModel
 from pydantic import PrivateAttr
 
@@ -30,8 +33,54 @@ class GoogleLLMManager(LLMManager):
 
     _client: genai.Client | None = PrivateAttr(default=None)
 
+    def _get_oauth_client(self) -> genai.Client:
+        oauth_path = Path(
+            os.environ.get("GEMINI_OAUTH_CREDS_PATH", str(Path.home() / ".gemini" / "oauth_creds.json"))
+        )
+        if not oauth_path.exists():
+            raise FileNotFoundError(
+                f"GEMINI_USE_OAUTH is set, but OAuth credentials are missing at {oauth_path}."
+            )
+
+        oauth = json.loads(oauth_path.read_text(encoding="utf-8"))
+        token = oauth.get("access_token")
+        if not isinstance(token, str) or not token:
+            raise ValueError(f"Invalid Gemini OAuth credentials at {oauth_path}: missing access_token")
+
+        scopes = oauth.get("scope")
+        credentials = Credentials(
+            token=token,
+            refresh_token=oauth.get("refresh_token"),
+            token_uri=oauth.get("token_uri") or "https://oauth2.googleapis.com/token",
+            client_id=oauth.get("client_id"),
+            client_secret=oauth.get("client_secret"),
+            scopes=scopes.split() if isinstance(scopes, str) else None,
+        )
+
+        project = os.environ.get("GEMINI_OAUTH_PROJECT") or os.environ.get("GOOGLE_CLOUD_PROJECT")
+        if not project:
+            raise ValueError(
+                "Gemini OAuth project is not set. Set GEMINI_OAUTH_PROJECT or GOOGLE_CLOUD_PROJECT."
+            )
+        location = (
+            os.environ.get("GEMINI_OAUTH_LOCATION")
+            or os.environ.get("GOOGLE_CLOUD_LOCATION")
+            or "us-central1"
+        )
+
+        return genai.Client(
+            vertexai=True,
+            project=project,
+            location=location,
+            credentials=credentials,
+        )
+
     def get_client(self) -> genai.Client:
         if self._client is None:
+            if os.environ.get("GEMINI_USE_OAUTH", "").lower() in {"1", "true", "yes"}:
+                self._client = self._get_oauth_client()
+                return self._client
+
             use_vertex = os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in {
                 "1",
                 "true",
